@@ -1,6 +1,6 @@
 import logging
 from fastapi_opentracing import sync_get_current_span, tracer
-_logging_log = logging.Logger._log
+_logging_log = logging.Logger.log
 from opentracing import Span
 
 ERROR = "ERROR"
@@ -10,8 +10,7 @@ DEBUG = "DEBUG"
 
 error_level = [ERROR]
 
-def _logging_wrapper(self, level, msg, args, exc_info=None, extra=None, stack_info=False,
-             stacklevel=1):
+def _logging_wrapper(self, level, msg, *args, **kwargs):
 
     child_span = None
     level_name = logging._levelToName.get(level)
@@ -25,10 +24,10 @@ def _logging_wrapper(self, level, msg, args, exc_info=None, extra=None, stack_in
             )
             child_span.log_kv({"event": "error", "message": msg, "level": level_name})
 
-    _logging_log(self, level, msg, args, exc_info, extra, stack_info, stacklevel)    
+    _logging_log(self, level, msg, *args, **kwargs)    
 
     if child_span is not None:
         child_span.finish()
 
 def install_patch():
-    logging.Logger._log = _logging_wrapper
+    logging.Logger.log = _logging_wrapper
