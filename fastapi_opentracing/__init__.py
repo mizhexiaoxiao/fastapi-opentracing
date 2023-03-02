@@ -15,6 +15,9 @@ config = Config(
         "reporter_queue_size": 2000,
         "propagation": "b3",  # Compatible with istio
         "generate_128bit_trace_id": True,  # Compatible with istio
+        # Initializing the tracer will execute the gethostbyname function, 
+        # which is very time-consuming. Set the host here to avoid searching
+        "tags": {"ip": "127.0.0.1"} 
     },
     service_name=f"{project_name}.{namespace}",
     scope_manager=ContextVarsScopeManager(),
