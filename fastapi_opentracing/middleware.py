@@ -74,6 +74,10 @@ class OpenTracingMiddleware(SimpleBaseMiddleware):
             rpc_tag['framework'] = 'Fastapi'
             rpc_tag['uri'] = request.url._url.split("?")[0]
             rpc_tag['method'] = request.method
+            # force sampling policy for tailsamplingprocessor
+            force_trace = request.headers.get("x-weike-force-trace")
+            if force_trace:
+                rpc_tag['x-weike-force-trace'] = "yes"
 
             span = tracer.start_span(
                 operation_name="opentracing-middleware",
