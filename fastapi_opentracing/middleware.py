@@ -74,6 +74,11 @@ class OpenTracingMiddleware(SimpleBaseMiddleware):
             rpc_tag['framework'] = 'Fastapi'
             rpc_tag['uri'] = request.url._url.split("?")[0]
             rpc_tag['method'] = request.method
+            rpc_tag['query_params'] = str(request.query_params)
+            rpc_tag["client_ip"] = request.client.host if request.client else None
+            rpc_tag["user_agent"] = request.headers.get('user-agent'),
+            rpc_tag["host"] = request.headers.get("host")
+            rpc_tag["route"] = request.url.path
             # force sampling policy for tailsamplingprocessor
             force_trace = request.headers.get("x-weike-force-trace")
             if force_trace:
