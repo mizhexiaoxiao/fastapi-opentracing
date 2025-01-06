@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import opentracing
 from opentracing.ext import tags
-from fastapi_opentracing import tracer, get_current_span
+from fastapi_opentracing import tracer, get_current_span, get_tracer
 from ._const import TRANS_TAGS
 
 
@@ -12,6 +12,23 @@ class Context:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
+
+
+class SpanContext:
+    def __init__(self, operation_span, endpoint_span):
+        self.operation_span = operation_span
+        self.endpoint_span = endpoint_span
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.endpoint_span.finish()
+        self.operation_span.finish()
+    
+    def finish(self):
+        self.endpoint_span.finish()
+        self.operation_span.finish()
 
 
 async def db_span(self, query: str, db_instance, db_type="SQL"):
@@ -43,10 +60,30 @@ async def db_span(self, query: str, db_instance, db_type="SQL"):
     database = (
         self.database if hasattr(self, "database") else self._parent.database
     )
-    span_tag[tags.PEER_ADDRESS] = f"{db_instance}://{host}:{port}/{database}"
-    return start_child_span(
+    peer_address = f"{db_instance}://{host}:{port}/{database}"
+    span_tag[tags.PEER_ADDRESS] = peer_address
+
+    db_span = start_child_span(
         operation_name=operation, tracer=tracer, parent=span, span_tag=span_tag
     )
+    
+    # 添加应用端点span
+    endpoint_span_tag = {
+        tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+        "application": db_instance,
+        "component": db_type,
+        tags.DATABASE_INSTANCE: db_instance,
+        tags.PEER_ADDRESS: span_tag[tags.PEER_ADDRESS]
+    }
+
+    database_tracer = get_tracer(peer_address)
+    endpoint_span = database_tracer.start_span(
+        operation_name=f"{db_instance}_endpoint",
+        child_of=db_span,
+        tags=endpoint_span_tag
+    )
+    
+    return SpanContext(db_span, endpoint_span)
 
 
 def redis_span(self, span, operation, statement, db_instance, db_type="redis"):
@@ -76,13 +113,32 @@ def redis_span(self, span, operation, statement, db_instance, db_type="redis"):
         if hasattr(self._pool_or_conn, "maxsize")
         else " "
     )
-    span_tag[tags.PEER_ADDRESS] = f"redis://:{host}:{port}/{db}"
+    peer_address = f"redis://:{host}:{port}/{db}"
+    span_tag[tags.PEER_ADDRESS] = peer_address
     span_tag["redis.minsize"] = minsize
     span_tag["redis.maxsize"] = maxsize
 
-    return start_child_span(
+    redis_span = start_child_span(
         operation_name=operation, tracer=tracer, parent=span, span_tag=span_tag
     )
+    
+    # 添加Redis端点span
+    endpoint_span_tag = {
+        "application": db_instance,
+        "component": db_type,
+        tags.DATABASE_INSTANCE: db_instance,
+        tags.PEER_ADDRESS: peer_address,
+        "redis.minsize": span_tag["redis.minsize"],
+        "redis.maxsize": span_tag["redis.maxsize"]
+    }
+    redis_tracer = get_tracer(peer_address)
+    endpoint_span = redis_tracer.start_span(
+        operation_name=f"{db_instance}_endpoint",
+        child_of=redis_span,
+        tags=endpoint_span_tag
+    )
+
+    return SpanContext(redis_span, endpoint_span)
 
 
 async def redis_span_high_level(
@@ -102,12 +158,31 @@ async def redis_span_high_level(
     port = conn_kwargs.get("port", 6379)
     max_connections = conn_kwargs.get("max_connections", "")
 
-    span_tag[tags.PEER_ADDRESS] = f"redis://:{host}:{port}/{db}"
+    peer_address = f"redis://:{host}:{port}/{db}"
+    span_tag[tags.PEER_ADDRESS] = peer_address
     span_tag["redis.maxsize"] = max_connections
 
-    return start_child_span(
+    redis_span = start_child_span(
         operation_name=operation, tracer=tracer, parent=span, span_tag=span_tag
     )
+    
+    # 添加Redis端点span
+    endpoint_span_tag = {
+        tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+        "application": db_instance,
+        "component": db_type,
+        tags.DATABASE_INSTANCE: db_instance,
+        tags.PEER_ADDRESS: peer_address,
+        "redis.maxsize": span_tag["redis.maxsize"]
+    }
+    redis_tracer = get_tracer(peer_address)
+    endpoint_span = redis_tracer.start_span(
+        operation_name=f"{db_instance}_endpoint",
+        child_of=redis_span,
+        tags=endpoint_span_tag
+    )
+    
+    return SpanContext(redis_span, endpoint_span)
 
 
 def start_child_span(
