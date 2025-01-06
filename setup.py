@@ -23,7 +23,7 @@ def read_requirements(filename):
 
 setuptools.setup(
     name="fastapi_opentracing",
-    version="0.7.13",
+    version="0.7.14",
     author="Du Wei",
     author_email="pandorid@gmail.com",
     description="fastapi opentracing middleware works with istio",
@@ -47,7 +47,8 @@ setuptools.setup(
             'coverage',
             'flake8',
             'aioredis>=1.3.1',
-            'tortoise-orm>=0.16.17'
+            'tortoise-orm>=0.16.17',
+            'aiohttp>=3.6.2'
         ]
     },
 )
