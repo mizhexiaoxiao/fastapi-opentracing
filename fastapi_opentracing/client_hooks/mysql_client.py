@@ -11,6 +11,7 @@ from tortoise.exceptions import (
 try:
     import tortoise.backends.mysql
     import pymysql
+    from tortoise import __version__
 except ImportError:
     pass
 else:
@@ -24,8 +25,13 @@ else:
     _tortoise_mysql_client_execute_many = (
         tortoise.backends.mysql.client.TransactionWrapper.execute_many
     )
-    _tortoise_mysql_client_start = (
-        tortoise.backends.mysql.client.TransactionWrapper.start
+    # 根据版本选择正确的方法名
+    _transaction_start_method = (
+        "begin" if __version__ >= "0.23.0" else "start"
+    )
+    _tortoise_mysql_client_start = getattr(
+        tortoise.backends.mysql.client.TransactionWrapper,
+        _transaction_start_method
     )
     _tortoise_mysql_client_commit = (
         tortoise.backends.mysql.client.TransactionWrapper.commit
@@ -145,9 +151,15 @@ def install_patch():
     tortoise.backends.mysql.client.TransactionWrapper.execute_many = (
         mysql_execute_many_wrapper
     )
-    tortoise.backends.mysql.client.TransactionWrapper.start = (
-        mysql_trans_start_wrapper
-    )
+    # 根据版本选择要patch的方法
+    if __version__ >= "0.23.0":
+        tortoise.backends.mysql.client.TransactionWrapper.begin = (
+            mysql_trans_start_wrapper
+        )
+    else:
+        tortoise.backends.mysql.client.TransactionWrapper.start = (
+            mysql_trans_start_wrapper
+        )
     tortoise.backends.mysql.client.TransactionWrapper.commit = (
         mysql_trans_commit_wrapper
     )

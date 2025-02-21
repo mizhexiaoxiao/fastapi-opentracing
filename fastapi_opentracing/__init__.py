@@ -66,11 +66,17 @@ async def get_current_span():
     scope = tracer.scope_manager.active
     if scope is not None:
         return scope.span
-    return None
+    else:
+        span = tracer.start_span(operation_name=f"{project_name}.{namespace}_root")
+        tracer.scope_manager.activate(span, True)
+        return span
 
 
 def sync_get_current_span():
     scope = tracer.scope_manager.active
     if scope is not None:
         return scope.span
-    return None
+    else:
+        span = tracer.start_span(operation_name=f"{project_name}.{namespace}_root")
+        tracer.scope_manager.activate(span, True)
+        return span

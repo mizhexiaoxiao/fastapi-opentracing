@@ -6,14 +6,18 @@ from fastapi_opentracing import get_current_span, sync_get_current_span
 from fastapi_opentracing import tracer
 
 try:
-    import aioredis
-    from aioredis import client
+    from redis import asyncio as aioredis
+    from redis.asyncio import client
 except ImportError:
-    pass
-else:
-    _execute_command = aioredis.Redis.execute_command
-    _pipeline = aioredis.Redis.pipeline
-    _pipeline_execute = client.Pipeline.execute
+    try:
+        import aioredis
+        from aioredis import client
+    except ImportError:
+        pass
+
+_execute_command = aioredis.Redis.execute_command
+_pipeline = aioredis.Redis.pipeline
+_pipeline_execute = client.Pipeline.execute
 
 try:
     import ujson as json
@@ -21,7 +25,7 @@ except Exception:
     import json
 
 
-async def excute_command_wrapper(self, *args, **kwargs):
+async def execute_command_wrapper(self, *args, **kwargs):
     span = await get_current_span()
     if span is None:
         return await _execute_command(self, *args, **kwargs)
@@ -29,7 +33,8 @@ async def excute_command_wrapper(self, *args, **kwargs):
         cmd = args[0]
         statement = json.dumps(dict(cmd=cmd, args=list(map(str, args[1:]))))
     except Exception as e:
-        print(f"opentracing-error {repr(e)}")
+        import logging
+        logging.error(f"opentracing-error: {repr(e)}")
         return await _execute_command(self, *args, **kwargs)
     else:
         with await redis_span_high_level(
@@ -59,6 +64,6 @@ async def pipeline_execute_wrapper(self, raise_on_error: bool = True):
 
 
 def install_patch():
-    aioredis.Redis.execute_command = excute_command_wrapper
+    aioredis.Redis.execute_command = execute_command_wrapper
     aioredis.Redis.pipeline = pipeline_wrapper
     client.Pipeline.execute = pipeline_execute_wrapper
