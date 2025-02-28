@@ -53,12 +53,12 @@ async def db_span(self, query: str, db_instance, db_type="SQL"):
     span_tag[tags.DATABASE_TYPE] = db_type
     span_tag[tags.DATABASE_INSTANCE] = db_instance
     span_tag[tags.DATABASE_USER] = (
-        self.user if hasattr(self, "user") else self._parent.user
+        self.user if hasattr(self, "user") else " "
     )
-    host = self.host if hasattr(self, "host") else self._parent.host
-    port = self.port if hasattr(self, "port") else self._parent.port
+    host = self.host if hasattr(self, "host") else " "
+    port = self.port if hasattr(self, "port") else " "
     database = (
-        self.database if hasattr(self, "database") else self._parent.database
+        self.database if hasattr(self, "database") else " "
     )
     peer_address = f"{db_instance}://{host}:{port}/{database}"
     span_tag[tags.PEER_ADDRESS] = peer_address
